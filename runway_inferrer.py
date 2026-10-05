@@ -1,3 +1,9 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from opensky_client import TrackWaypoint
+
 CARDINAL_DIRECTIONS = [
     "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
     "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"
@@ -15,6 +21,28 @@ def angular_difference(deg1: float, deg2: float) -> float:
     Computes shortest angular difference in degrees between two headings.
     """
     return abs((deg1 - deg2 + 180) % 360 - 180)
+
+def extract_takeoff_heading(track: list[TrackWaypoint]) -> Optional[float]:
+    """
+    Returns the true_track of the first airborne waypoint in a historical track,
+    which is the best available approximation of the actual takeoff heading.
+
+    The function scans the track (assumed sorted oldest-first) for the transition
+    from on_ground=True → on_ground=False and returns the heading of the first
+    waypoint where on_ground is False and true_track is not None.
+
+    Returns None if:
+      - the track is empty or too short to contain a liftoff transition, or
+      - no airborne waypoint with a valid heading is found.
+    """
+    if not track:
+        return None
+
+    for wp in track:
+        if not wp.on_ground and wp.true_track is not None:
+            return wp.true_track
+
+    return None
 
 def infer_runway(true_track: float, runways: dict[str, int]) -> tuple[str, str]:
     """

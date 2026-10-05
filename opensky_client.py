@@ -4,6 +4,15 @@ import time
 import requests
 
 @dataclass
+class TrackWaypoint:
+    timestamp: int       # unix epoch
+    latitude: float
+    longitude: float
+    altitude_m: Optional[float]  # baro altitude in metres; None if unknown
+    true_track: Optional[float]  # 0–360°, clockwise from north; None if unknown
+    on_ground: bool
+
+@dataclass
 class StateVector:
     icao24: str       # hex transponder ID
     callsign: str     # e.g. "SWA1234"
@@ -112,4 +121,54 @@ class OpenSkyClient:
             return vectors
         except Exception as e:
             print(f"[OpenSky] Fetch error: {e}")
+            return []
+
+    def get_track_by_aircraft(self, icao24: str, at_time: int = 0) -> list[TrackWaypoint]:
+        """
+        Fetches the historical flight track for a given ICAO24 transponder address.
+
+        Args:
+            icao24:  Hex transponder address (e.g. \"a1b2c3\").
+            at_time: Optional Unix timestamp.  When 0 (default) the API returns the
+                     most-recently-stored track for the aircraft.
+
+        Returns:
+            A list of TrackWaypoint objects sorted ascending by timestamp.
+            Returns an empty list if the track is unavailable or the request fails.
+        """
+        url = "https://opensky-network.org/api/tracks/all"
+        params: dict = {"icao24": icao24.lower()}
+        if at_time:
+            params["time"] = at_time
+
+        headers = self._get_auth_headers()
+        try:
+            resp = requests.get(url, params=params, headers=headers, timeout=15)
+            if resp.status_code == 404:
+                # Aircraft has no stored track – not an error worth logging
+                return []
+            if resp.status_code != 200:
+                print(f"[OpenSky] get_track_by_aircraft returned {resp.status_code} for {icao24}")
+                return []
+
+            data = resp.json()
+            raw_path = data.get("path") or []
+            waypoints: list[TrackWaypoint] = []
+            for point in raw_path:
+                # Each element: [time, lat, lon, baro_alt, true_track, on_ground]
+                if not isinstance(point, list) or len(point) < 6:
+                    continue
+                waypoints.append(TrackWaypoint(
+                    timestamp=int(point[0]),
+                    latitude=float(point[1]) if point[1] is not None else 0.0,
+                    longitude=float(point[2]) if point[2] is not None else 0.0,
+                    altitude_m=float(point[3]) if point[3] is not None else None,
+                    true_track=float(point[4]) if point[4] is not None else None,
+                    on_ground=bool(point[5]),
+                ))
+            # Sort oldest first to make it easy to find the first airborne moment
+            waypoints.sort(key=lambda w: w.timestamp)
+            return waypoints
+        except Exception as e:
+            print(f"[OpenSky] get_track_by_aircraft error for {icao24}: {e}")
             return []

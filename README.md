@@ -1,15 +1,16 @@
 # BWI Flyover Tracker
 
-A Python CLI application that polls live ADS-B flight data for commercial departures from Baltimore/Washington International Thurgood Marshall Airport (BWI), detects flyovers above a configurable home location (e.g. Elkridge, MD), and logs detected flyovers with flight, runway, and METAR weather information.
+A Python CLI application that polls live ADS-B flight data for commercial departures from Baltimore/Washington International Thurgood Marshall Airport (BWI), detects flyovers above a configurable home location (e.g. Elkridge, MD), and logs detected flyovers with flight details, aircraft type, destination, runway, and METAR weather information.
 
 ## Features
 
 - **Automated Geocoding**: Geocodes street addresses via Nominatim (OpenStreetMap) on startup.
 - **Live Flight Polling**: Query OpenSky Network REST API for state vectors in an auto-calculated bounding box.
 - **Flight Filtering**: Filters airborne commercial flights within a configurable altitude window (500–10,000 ft) and detection radius.
+- **Aircraft & Route Enrichment**: Auto-fetches aircraft model (e.g. `A320`, `B738` / `Boeing 737-800`) and destination route info (e.g. `FLL`, `BDL ⟶ FLL`).
 - **Runway Inference**: Infers departure runway (28, 10, 15R, 33L) based on plane true track heading.
 - **Weather Integration**: Fetches real-time KBWI METAR wind direction, speed, and gusts from NOAA Aviation Weather Center with a 10-minute cache.
-- **Formatted Logging**: Appends JSON records to `flyovers.jsonl` and outputs clean, formatted alert blocks to stdout.
+- **Formatted Logging**: Appends enriched JSON records to `flyovers.jsonl` and outputs clean, formatted alert blocks to stdout.
 
 ## Installation
 
@@ -51,7 +52,9 @@ Runways      : 10 (105°), 28 (285°), 15R (155°), 33L (335°)
 Waiting for flyovers...
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✈  SWA1234          2026-10-05 07:12:33 EDT
+✈  JBU959           2026-10-05 07:12:33 EDT
+   Aircraft  : A320 (Airbus A320 232)
+   Destination: FLL (Windsor Locks (BDL) ⟶ Fort Lauderdale (FLL))
    Altitude  : 3,200 ft  |  Speed: 245 kt
    Heading   : 281°
    Runway    : 28 (West)
@@ -65,7 +68,5 @@ Waiting for flyovers...
 
 Run unit tests via `pytest` or `unittest`:
 ```bash
-pytest
-# or
-python -m unittest discover tests
+python -m unittest discover tests -v
 ```

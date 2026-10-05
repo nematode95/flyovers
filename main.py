@@ -4,6 +4,7 @@ from opensky_client import OpenSkyClient
 import flyover_detector
 import runway_inferrer
 import weather_client
+import flight_enricher
 import record_builder
 import printer
 
@@ -42,9 +43,35 @@ def main():
                 if flyover_detector.is_flyover(sv, settings):
                     # Deduplicate: same plane can't trigger twice within 10 minutes (600s)
                     if now - seen.get(sv.icao24, 0) > 600:
-                        runway, label = runway_inferrer.infer_runway(sv.true_track, settings.runways)
+
+                        # --- Attempt to get the true historical takeoff heading ---
+                        # The live sv.true_track is the heading at this moment (mid-flight),
+                        # which may differ significantly from the runway heading due to SID turns.
+                        # The /tracks/all endpoint returns the full stored waypoint path;
+                        # the first airborne waypoint is the closest approximation to liftoff.
+                        track = client.get_track_by_aircraft(sv.icao24)
+                        takeoff_hdg = runway_inferrer.extract_takeoff_heading(track)
+
+                        if takeoff_hdg is not None:
+                            # Use the historically-derived first-airborne heading
+                            heading_for_runway = takeoff_hdg
+                            heading_source = "historical_track"
+                        else:
+                            # Fall back to the current live heading if no track is available
+                            # (e.g. unauthenticated, API outage, or no stored track yet)
+                            heading_for_runway = sv.true_track
+                            heading_source = "flyover_fallback"
+                            print(f"[Track] No historical track for {sv.icao24} ({sv.callsign.strip()}); "
+                                  "using live flyover heading as fallback.")
+
+                        runway, label = runway_inferrer.infer_runway(heading_for_runway, settings.runways)
                         wind = weather_client.get_wind_kbwi()
-                        record = record_builder.build(sv, runway, label, wind)
+                        enrichment = flight_enricher.enrich_flight(sv.icao24, sv.callsign)
+                        record = record_builder.build(
+                            sv, runway, label, wind, enrichment,
+                            takeoff_heading_deg=takeoff_hdg,
+                            heading_source=heading_source,
+                        )
                         printer.print_and_log(record, velocity_mps=sv.velocity_mps)
                         seen[sv.icao24] = now
         except KeyboardInterrupt:

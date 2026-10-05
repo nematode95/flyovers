@@ -19,18 +19,37 @@ def print_and_log(record: FlyoverRecord, velocity_mps: float = 0.0, log_file: st
 
     speed_kt = int(round(velocity_mps * 1.94384)) if velocity_mps else 0
     formatted_ts = format_timestamp(record.timestamp)
-    
+
     if record.wind_gust_kt:
         wind_str = f"{record.wind_direction_deg}° at {record.wind_speed_kt} kt, gusting {record.wind_gust_kt} kt"
     else:
         wind_str = f"{record.wind_direction_deg}° at {record.wind_speed_kt} kt"
 
+    ac_display = f"{record.aircraft_type} ({record.aircraft_model})" if record.aircraft_type != "UNKNOWN" else record.aircraft_model
+    dest_display = f"{record.destination} ({record.route})" if record.destination != "UNKNOWN" else record.route
+
+    # Format the heading line: prefer historical takeoff heading; show live flyover track as context
+    if record.takeoff_heading_deg is not None:
+        heading_str = (
+            f"{int(round(record.takeoff_heading_deg))}°  "
+            f"(flyover track: {int(round(record.flyover_track_deg))}°, "
+            f"source: {record.heading_source})"
+        )
+    else:
+        heading_str = (
+            f"{int(round(record.flyover_track_deg))}°  "
+            f"(source: {record.heading_source})"
+        )
+
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     print(f"✈  {record.flight_number:<16} {formatted_ts}")
+    print(f"   Aircraft  : {ac_display}")
+    print(f"   Destination: {dest_display}")
     print(f"   Altitude  : {record.altitude_ft:,} ft  |  Speed: {speed_kt} kt")
-    print(f"   Heading   : {int(round(record.true_track_deg))}°")
+    print(f"   Takeoff hdg: {heading_str}")
     print(f"   Runway    : {record.runway_direction}")
     print(f"   Wind      : {wind_str}")
     print(f"   METAR     : {record.raw_metar}")
     print(f"   Logged to : {log_file}")
     print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
