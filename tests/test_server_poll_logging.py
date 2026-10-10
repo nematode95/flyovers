@@ -1,11 +1,12 @@
 import io
+import os
 import unittest
 from contextlib import redirect_stdout
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from config import Settings
 from opensky_client import StateVector
-from server import TrackerWorker
+from server import FlyoverRequestHandler, TrackerWorker
 
 
 class TestPollAircraftLogging(unittest.TestCase):
@@ -88,3 +89,47 @@ class TestPollAircraftLogging(unittest.TestCase):
         self.assertIn("\033[31mP01\033[0m [000001]", outputs[2])
         self.assertIn("\033[35m", outputs[3])
         self.assertIn("\033[35mP01\033[0m [000001]", outputs[3])
+
+
+class TestConfigEndpointAuth(unittest.TestCase):
+    def make_handler(self, authorization=""):
+        handler = object.__new__(FlyoverRequestHandler)
+        handler.path = "/api/config"
+        body = b'{"running": false}'
+        handler.headers = {"Authorization": authorization, "Content-Length": str(len(body))}
+        handler.rfile = io.BytesIO(body)
+        handler.worker = Mock()
+        handler._send_json = Mock()
+        return handler
+
+    def test_config_endpoint_is_disabled_without_token(self):
+        handler = self.make_handler("Bearer valid-token")
+
+        with patch.dict(os.environ, {"API_CONFIG_TOKEN": ""}):
+            handler.do_POST()
+
+        handler._send_json.assert_called_once_with(
+            503,
+            {"error": "Configuration endpoint is disabled; API_CONFIG_TOKEN is not set."},
+        )
+        handler.worker.set_config.assert_not_called()
+
+    def test_config_endpoint_rejects_missing_or_invalid_token(self):
+        for authorization in ("", "Bearer wrong-token", "Basic valid-token"):
+            with self.subTest(authorization=authorization):
+                handler = self.make_handler(authorization)
+
+                with patch.dict(os.environ, {"API_CONFIG_TOKEN": "valid-token"}):
+                    handler.do_POST()
+
+                handler._send_json.assert_called_once_with(401, {"error": "Unauthorized"})
+                handler.worker.set_config.assert_not_called()
+
+    def test_config_endpoint_accepts_valid_bearer_token(self):
+        handler = self.make_handler("Bearer valid-token")
+
+        with patch.dict(os.environ, {"API_CONFIG_TOKEN": "valid-token"}):
+            handler.do_POST()
+
+        handler.worker.set_config.assert_called_once_with(running=False, poll_interval_sec=None)
+        handler._send_json.assert_called_once_with(200, handler.worker.get_status())

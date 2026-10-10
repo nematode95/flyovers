@@ -1,3 +1,4 @@
+import hmac
 import json
 import os
 import threading
@@ -313,6 +314,21 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
         path = parsed.path.rstrip("/")
 
         if path == "/api/config":
+            config_token = os.getenv("API_CONFIG_TOKEN", "")
+            if not config_token:
+                self._send_json(503, {"error": "Configuration endpoint is disabled; API_CONFIG_TOKEN is not set."})
+                return
+
+            authorization = self.headers.get("Authorization", "")
+            scheme, separator, supplied_token = authorization.partition(" ")
+            if (
+                scheme.lower() != "bearer"
+                or not separator
+                or not hmac.compare_digest(supplied_token, config_token)
+            ):
+                self._send_json(401, {"error": "Unauthorized"})
+                return
+
             try:
                 content_len = int(self.headers.get("Content-Length", 0))
                 raw_body = self.rfile.read(content_len).decode("utf-8")

@@ -26,6 +26,7 @@ Copy `.env.example` to `.env` and adjust settings as needed:
 ```ini
 OPENSKY_CLIENT_ID=your_client_id_here
 OPENSKY_CLIENT_SECRET=your_client_secret_here
+API_CONFIG_TOKEN=replace_with_a_long_random_secret
 LISTEN_ADDRESS=123 Main St, Elkridge, MD 21075
 FLYOVER_RADIUS_NM=1.0
 BBOX_PADDING_NM=20.0
@@ -33,6 +34,8 @@ POLL_INTERVAL_SEC=30
 ```
 
 `BBOX_PADDING_NM` controls how much extra area around the flyover radius is queried from OpenSky. The default of `20.0` means the bounding box extends approximately 21 nautical miles in each cardinal direction from the listening location (20 nm padding plus the 1 nm flyover radius). This affects which aircraft are fetched and shown in bbox poll summaries; it does not change the flyover detection radius.
+
+`API_CONFIG_TOKEN` is required to enable `POST /api/config`. Send it as an `Authorization: Bearer <token>` header. If it is unset, that endpoint is disabled. Set the value as a secret environment variable in Render.
 
 ## Running the App
 

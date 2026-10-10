@@ -5,7 +5,7 @@
    GET          | /api/flyovers | Returns all detected flyovers (newest first). Supports ?limit=N (e.g. ?limit=10).
    GET          | /api/status   | Returns the current tracker state, poll interval, whether it is active, and total logged.
    GET          | /api/live     | Returns the current aircraft currently inside your bounding box from the last poll.
-   POST         | /api/config   | Update configuration dynamically (turn on/off, adjust poll interval).
+   POST         | /api/config   | Update configuration dynamically (requires an API_CONFIG_TOKEN bearer token).
   ──────
   ### Quick Test Commands
 
@@ -24,11 +24,13 @@
 
     curl -s -X POST http://localhost:8080/api/config \
       -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $API_CONFIG_TOKEN" \
       -d '{"running": false}'
 
   #### 4. Resume tracking & adjust interval
     curl -s -X POST http://localhost:8080/api/config \
       -H "Content-Type: application/json" \
+      -H "Authorization: Bearer $API_CONFIG_TOKEN" \
       -d '{"running": true, "poll_interval_sec": 30}'
   ──────
   ### How to Run It in the Future
