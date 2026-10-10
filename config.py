@@ -15,8 +15,9 @@ except ImportError:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip())
 
+# TODO consider the little runway labels like 15L and 33R, which are not in the original BWI runways list.  For now, we will just ignore them.
+# 335 is correct see https://marylandaviation.com/environmental/airport-noise/acronyms-faqs-more/   
 @dataclass
 class Settings:
     opensky_client_id: str
@@ -25,6 +26,7 @@ class Settings:
     listen_lat: float
     listen_lon: float
     flyover_radius_nm: float
+    bbox_padding_nm: float
     bbox: dict
     poll_interval_sec: int
     runways: dict[str, int] = field(default_factory=lambda: {
@@ -34,7 +36,7 @@ class Settings:
         "33L": 335
     })
 
-def compute_bbox(lat: float, lon: float, radius_nm: float, padding_nm: float = 5.0) -> dict:
+def compute_bbox(lat: float, lon: float, radius_nm: float, padding_nm: float = 20.0) -> dict:
     total_radius = radius_nm + padding_nm
     # 1 nm latitude ≈ 1/60°
     lat_delta = total_radius / 60.0
@@ -60,12 +62,17 @@ def load_settings() -> Settings:
         radius_nm = 1.0
 
     try:
+        bbox_padding_nm = float(os.getenv("BBOX_PADDING_NM", "20.0"))
+    except ValueError:
+        bbox_padding_nm = 20.0
+
+    try:
         poll_interval_sec = int(os.getenv("POLL_INTERVAL_SEC", "30"))
     except ValueError:
         poll_interval_sec = 30
 
     lat, lon = geocode_address(address)
-    bbox = compute_bbox(lat, lon, radius_nm)
+    bbox = compute_bbox(lat, lon, radius_nm, bbox_padding_nm)
 
     return Settings(
         opensky_client_id=client_id,
@@ -74,6 +81,7 @@ def load_settings() -> Settings:
         listen_lat=lat,
         listen_lon=lon,
         flyover_radius_nm=radius_nm,
+        bbox_padding_nm=bbox_padding_nm,
         bbox=bbox,
         poll_interval_sec=poll_interval_sec
     )

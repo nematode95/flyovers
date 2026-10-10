@@ -12,6 +12,7 @@ class TestFlyoverDetector(unittest.TestCase):
             listen_lat=39.2100,
             listen_lon=-76.7100,
             flyover_radius_nm=1.0,
+            bbox_padding_nm=20.0,
             bbox={},
             poll_interval_sec=30
         )

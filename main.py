@@ -20,6 +20,7 @@ def main():
     print(f"Listening at : {settings.listen_address}")
     print(f"Coordinates  : {settings.listen_lat:.5f}°N, {abs(settings.listen_lon):.5f}°W")
     print(f"Radius       : {settings.flyover_radius_nm} nm (~{settings.flyover_radius_nm * 1.15:.2f} miles)")
+    print(f"BBox padding : {settings.bbox_padding_nm} nm around the flyover radius")
     print(f"Poll interval: {settings.poll_interval_sec}s")
     print("Log file     : flyovers.jsonl")
     runway_str = ", ".join(f"{k} ({v}°)" for k, v in settings.runways.items())

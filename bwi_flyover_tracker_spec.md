@@ -99,6 +99,10 @@ LISTEN_ADDRESS=123 Main St, Elkridge, MD 21075
 # 1 nm ≈ 1.15 miles. Start with 1.0 and tune down if too noisy.
 FLYOVER_RADIUS_NM=1.0
 
+# --- OpenSky search area ---
+# Extra distance beyond the flyover radius included in the queried bounding box.
+BBOX_PADDING_NM=20.0
+
 # --- Polling ---
 # How often to query OpenSky (seconds). Minimum recommended: 30
 POLL_INTERVAL_SEC=30

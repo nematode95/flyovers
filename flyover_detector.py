@@ -3,6 +3,8 @@ import re
 from opensky_client import StateVector
 from config import Settings
 
+MAX_FLYOVER_ALTITUDE_FT = 10000
+
 def haversine_nm(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """
     Calculates the great-circle distance between two points on Earth in Nautical Miles.
@@ -33,7 +35,7 @@ def is_flyover(sv: StateVector, settings: Settings) -> bool:
         return False
 
     altitude_ft = sv.altitude_m * 3.28084
-    if not (500 <= altitude_ft <= 10000):
+    if not (500 <= altitude_ft <= MAX_FLYOVER_ALTITUDE_FT):
         return False
 
     callsign = (sv.callsign or "").strip()

@@ -5,7 +5,7 @@ A Python CLI application that polls live ADS-B flight data for commercial depart
 ## Features
 
 - **Automated Geocoding**: Geocodes street addresses via Nominatim (OpenStreetMap) on startup.
-- **Live Flight Polling**: Query OpenSky Network REST API for state vectors in an auto-calculated bounding box.
+- **Live Flight Polling**: Query OpenSky Network REST API for state vectors in an auto-calculated bounding box; poll summaries list the 10 closest aircraft first with distance and altitude trend colors (green climbing, red descending, violet above 10,000 ft).
 - **Flight Filtering**: Filters airborne commercial flights within a configurable altitude window (500–10,000 ft) and detection radius.
 - **Aircraft & Route Enrichment**: Auto-fetches aircraft model (e.g. `A320`, `B738` / `Boeing 737-800`) and destination route info (e.g. `FLL`, `BDL ⟶ FLL`).
 - **Runway Inference**: Infers departure runway (28, 10, 15R, 33L) based on plane true track heading.
@@ -28,8 +28,11 @@ OPENSKY_CLIENT_ID=your_client_id_here
 OPENSKY_CLIENT_SECRET=your_client_secret_here
 LISTEN_ADDRESS=123 Main St, Elkridge, MD 21075
 FLYOVER_RADIUS_NM=1.0
+BBOX_PADDING_NM=20.0
 POLL_INTERVAL_SEC=30
 ```
+
+`BBOX_PADDING_NM` controls how much extra area around the flyover radius is queried from OpenSky. The default of `20.0` means the bounding box extends approximately 21 nautical miles in each cardinal direction from the listening location (20 nm padding plus the 1 nm flyover radius). This affects which aircraft are fetched and shown in bbox poll summaries; it does not change the flyover detection radius.
 
 ## Running the App
 
