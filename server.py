@@ -166,8 +166,35 @@ class TrackerWorker:
                 for sv in vectors
             ]
 
+        aircraft_by_distance = sorted(
+            [
+                (
+                    sv,
+                    flyover_detector.haversine_nm(
+                        sv.latitude,
+                        sv.longitude,
+                        self.settings.listen_lat,
+                        self.settings.listen_lon,
+                    ),
+                )
+                for sv in vectors
+            ],
+            key=lambda item: item[1],
+        )
+        snapshot = self.get_live_snapshot()
+        aircraft_by_icao24 = {
+            aircraft["icao24"]: aircraft for aircraft in snapshot["aircraft"]
+        }
+        snapshot["aircraft"] = [
+            {
+                **aircraft_by_icao24[sv.icao24],
+                "distance_nm": round(distance_nm, 1),
+            }
+            for sv, distance_nm in aircraft_by_distance
+        ]
+
         try:
-            supabase_client.upsert_live_snapshot(self.get_live_snapshot())
+            supabase_client.upsert_live_snapshot(snapshot)
         except Exception as error:
             logger.error("Failed to sync live snapshot to Supabase: %s", error)
 
@@ -186,21 +213,6 @@ class TrackerWorker:
         if not vectors:
             print(f"[{time_str}] [Poll] 0 aircraft in bounding box.")
         else:
-            aircraft_by_distance = sorted(
-                [
-                    (
-                        sv,
-                        flyover_detector.haversine_nm(
-                            sv.latitude,
-                            sv.longitude,
-                            self.settings.listen_lat,
-                            self.settings.listen_lon,
-                        ),
-                    )
-                    for sv in vectors
-                ],
-                key=lambda item: item[1],
-            )
             ac_list = []
             for sv, distance_nm in aircraft_by_distance[:10]:
                 cs = sv.callsign.strip() or sv.icao24

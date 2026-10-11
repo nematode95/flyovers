@@ -65,8 +65,9 @@ class TestPollAircraftLogging(unittest.TestCase):
         ]
 
         output = io.StringIO()
-        with redirect_stdout(output):
-            worker._poll_once()
+        with patch("server.supabase_client.upsert_live_snapshot") as sync_snapshot:
+            with redirect_stdout(output):
+                worker._poll_once()
 
         log = output.getvalue()
         self.assertLess(log.index("P01 ["), log.index("P02 ["))
@@ -75,6 +76,31 @@ class TestPollAircraftLogging(unittest.TestCase):
         self.assertIn("+2 more", log)
         self.assertIn("P01 [000001]", log)
         self.assertIn("0.5nm", log)
+
+        synced_snapshot = sync_snapshot.call_args.args[0]
+        self.assertEqual(synced_snapshot["count"], 12)
+        self.assertEqual(len(synced_snapshot["aircraft"]), 12)
+        self.assertEqual(
+            [aircraft["callsign"] for aircraft in synced_snapshot["aircraft"]],
+            [f"P{index:02}" for index in range(1, 13)],
+        )
+        self.assertTrue(
+            all("distance_nm" in aircraft for aircraft in synced_snapshot["aircraft"])
+        )
+        distances = [aircraft["distance_nm"] for aircraft in synced_snapshot["aircraft"]]
+        self.assertEqual(distances[0], 0.5)
+        self.assertEqual(distances, sorted(distances))
+        self.assertEqual(
+            [aircraft["callsign"] for aircraft in worker.get_live_snapshot()["aircraft"]],
+            [f"P{index:02}" for index in range(12, 0, -1)],
+        )
+        self.assertTrue(
+            all(
+                "distance_nm" not in aircraft
+                for aircraft in worker.get_live_snapshot()["aircraft"]
+            )
+        )
+        self.assertEqual(json.loads(json.dumps(synced_snapshot)), synced_snapshot)
 
     def test_colors_altitude_by_trend_and_high_altitude(self):
         worker = TrackerWorker(self.make_settings())

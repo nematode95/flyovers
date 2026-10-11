@@ -49,7 +49,7 @@ Python log records are written to the terminal and appended to `flyovers.log` in
 
 This sync runs in the HTTP server (`python server.py`), which provides `GET /api/live`; the standalone `python main.py` CLI does not expose that endpoint.
 
-When both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, the server upserts the latest `/api/live` response after every poll into one row in `public.live_snapshot`. The row has `id = 'current'`, a `payload` JSONB column containing `last_poll_time`, `count`, and `aircraft`, and an `updated_at` timestamp. Empty polls replace the previous aircraft list with `count: 0` and `aircraft: []`. If the sync fails, the error is logged and local tracking continues. If both settings are absent, syncing is disabled.
+When both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, the server upserts a live snapshot after every poll into one row in `public.live_snapshot`. The row has `id = 'current'`, a `payload` JSONB column containing `last_poll_time`, `count`, and `aircraft`, and an `updated_at` timestamp. The Supabase `aircraft` array includes every aircraft in the bounding box, ordered nearest-first. Each object contains the fields returned by `GET /api/live` plus `distance_nm`, rounded to one decimal place. The `GET /api/live` response itself remains unchanged: its aircraft are in fetch order and do not include `distance_nm`. Empty polls replace the previous aircraft list with `count: 0` and `aircraft: []`. If the sync fails, the error is logged and local tracking continues. If both settings are absent, syncing is disabled.
 
 Create the table and read policy in the Supabase SQL editor:
 
@@ -81,7 +81,7 @@ const { data, error } = await supabase
   .single();
 ```
 
-`data.payload` has the same shape as `GET /api/live`.
+`data.payload` has the same top-level fields as `GET /api/live`, but its `aircraft` array includes nearest-first ordering and a `distance_nm` value on each aircraft object.
 
 ### Supabase recent flyovers
 
