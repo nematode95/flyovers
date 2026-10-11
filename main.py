@@ -1,4 +1,5 @@
 import time
+from api_logging import configure_logging
 from config import load_settings
 from opensky_client import OpenSkyClient
 import flyover_detector
@@ -9,6 +10,7 @@ import record_builder
 import printer
 
 def main():
+    configure_logging()
     try:
         settings = load_settings()
     except Exception as e:

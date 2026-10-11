@@ -4,6 +4,7 @@ from typing import Optional
 import requests
 import re
 import time
+from api_logging import logged_request
 
 @dataclass
 class WindObs:
@@ -56,7 +57,7 @@ def get_wind_kbwi() -> WindObs:
 
     url = "https://aviationweather.gov/api/data/metar?ids=KBWI&format=json"
     try:
-        resp = requests.get(url, timeout=10)
+        resp = logged_request("Aviation Weather", "GET", url, requests.get, timeout=10)
         resp.raise_for_status()
         data = resp.json()
         if data and isinstance(data, list) and len(data) > 0:

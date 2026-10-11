@@ -1,4 +1,5 @@
 import requests
+from api_logging import logged_request
 
 def geocode_address(address: str) -> tuple[float, float]:
     """
@@ -19,7 +20,15 @@ def geocode_address(address: str) -> tuple[float, float]:
         "limit": 1
     }
     try:
-        response = requests.get(url, headers=headers, params=params, timeout=10)
+        response = logged_request(
+            "Nominatim",
+            "GET",
+            url,
+            requests.get,
+            headers=headers,
+            params=params,
+            timeout=10,
+        )
         response.raise_for_status()
         data = response.json()
         if not data or len(data) == 0:

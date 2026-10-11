@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 import requests
+from api_logging import logged_request
 
 @dataclass
 class FlightEnrichment:
@@ -23,7 +24,7 @@ def get_aircraft_info(icao24: str) -> tuple[str, str]:
         "User-Agent": "bwi-flyover-tracker/1.0 (https://github.com/bwi-flyover-tracker)"
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = logged_request("HexDB aircraft lookup", "GET", url, requests.get, headers=headers, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             ac_type = data.get("ICAOTypeCode") or data.get("Type") or "UNKNOWN"
@@ -59,7 +60,7 @@ def get_route_info(callsign: str) -> tuple[str, str]:
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     try:
-        resp = requests.get(url, headers=headers, timeout=5)
+        resp = logged_request("FlightRadar24 route lookup", "GET", url, requests.get, headers=headers, timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             results = data.get("results") or []

@@ -14,6 +14,8 @@ import argparse
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Union, List
 
+from api_logging import configure_logging, log_call_started, log_http_error, log_http_response, logged_request
+
 # Try importing requests; fallback to urllib.request if unavailable
 try:
     import requests
@@ -98,7 +100,14 @@ class OpenSkyAuth:
         }
         if HAS_REQUESTS:
             try:
-                resp = requests.post(self.TOKEN_URL, data=data, timeout=10)
+                resp = logged_request(
+                    "OpenSky CLI OAuth",
+                    "POST",
+                    self.TOKEN_URL,
+                    requests.post,
+                    data=data,
+                    timeout=10,
+                )
                 if resp.status_code == 200:
                     res_json = resp.json()
                     return res_json.get("access_token"), res_json.get("expires_in", 1800)
@@ -112,13 +121,19 @@ class OpenSkyAuth:
                 encoded_data = urllib.parse.urlencode(data).encode("utf-8")
                 req = urllib.request.Request(self.TOKEN_URL, data=encoded_data, method="POST")
                 req.add_header("Content-Type", "application/x-www-form-urlencoded")
+                log_call_started("OpenSky CLI OAuth", "POST", self.TOKEN_URL)
                 with urllib.request.urlopen(req, timeout=10) as resp:
+                    response_body = resp.read()
+                    log_http_response("OpenSky CLI OAuth", "POST", self.TOKEN_URL, resp.status, response_body)
                     if resp.status == 200:
-                        res_json = json.loads(resp.read().decode("utf-8"))
+                        res_json = json.loads(response_body.decode("utf-8"))
                         return res_json.get("access_token"), res_json.get("expires_in", 1800)
             except urllib.error.HTTPError as e:
-                sys.stderr.write(f"[Auth Error] Failed ({e.code}): {e.read().decode('utf-8')[:200]}\n")
+                response_body = e.read()
+                log_http_response("OpenSky CLI OAuth", "POST", self.TOKEN_URL, e.code, response_body)
+                sys.stderr.write(f"[Auth Error] Failed ({e.code}): {response_body.decode('utf-8')[:200]}\n")
             except Exception as e:
+                log_http_error("OpenSky CLI OAuth", "POST", self.TOKEN_URL, e)
                 sys.stderr.write(f"[Auth Error] Request exception: {e}\n")
 
         return None, 0
@@ -201,7 +216,15 @@ def make_api_request(url: str, params: Dict[str, Any], headers: Dict[str, str]) 
     """Execute HTTP GET request to OpenSky REST API."""
     if HAS_REQUESTS:
         try:
-            resp = requests.get(url, params=params, headers=headers, timeout=20)
+            resp = logged_request(
+                "OpenSky CLI data",
+                "GET",
+                url,
+                requests.get,
+                params=params,
+                headers=headers,
+                timeout=20,
+            )
             if resp.status_code == 200:
                 return resp.json()
             else:
@@ -217,17 +240,23 @@ def make_api_request(url: str, params: Dict[str, Any], headers: Dict[str, str]) 
         query_string = urllib.parse.urlencode({k: v for k, v in params.items() if v is not None})
         full_url = f"{url}?{query_string}" if query_string else url
         req = urllib.request.Request(full_url, headers=headers, method="GET")
+        log_call_started("OpenSky CLI data", "GET", url)
         try:
             with urllib.request.urlopen(req, timeout=20) as resp:
+                response_body = resp.read()
+                log_http_response("OpenSky CLI data", "GET", url, resp.status, response_body)
                 if resp.status == 200:
-                    return json.loads(resp.read().decode("utf-8"))
+                    return json.loads(response_body.decode("utf-8"))
         except urllib.error.HTTPError as e:
-            body = e.read().decode("utf-8")
+            response_body = e.read()
+            log_http_response("OpenSky CLI data", "GET", url, e.code, response_body)
+            body = response_body.decode("utf-8")
             sys.stderr.write(f"HTTP Error {e.code}: {body[:300]}\n")
             if e.code == 400:
                 sys.stderr.write("Note: OpenSky flight endpoints limit query interval to maximum 7 days.\n")
             sys.exit(1)
         except Exception as e:
+            log_http_error("OpenSky CLI data", "GET", url, e)
             sys.stderr.write(f"Network error: {e}\n")
             sys.exit(1)
 
@@ -340,6 +369,7 @@ def main():
 
     # Load credentials automatically from .env
     load_env(args.env_file)
+    configure_logging()
     auth = OpenSkyAuth()
 
     # Default to departures if no subcommand given

@@ -10,7 +10,7 @@ A Python CLI application that polls live ADS-B flight data for commercial depart
 - **Aircraft & Route Enrichment**: Auto-fetches aircraft model (e.g. `A320`, `B738` / `Boeing 737-800`) and destination route info (e.g. `FLL`, `BDL ⟶ FLL`).
 - **Runway Inference**: Infers departure runway (28, 10, 15R, 33L) based on plane true track heading.
 - **Weather Integration**: Fetches real-time KBWI METAR wind direction, speed, and gusts from NOAA Aviation Weather Center with a 10-minute cache.
-- **Formatted Logging**: Appends enriched JSON records to `flyovers.jsonl` and outputs clean, formatted alert blocks to stdout.
+- **Formatted Logging**: Appends enriched JSON records to `flyovers.jsonl`, prints app output to the terminal, and appends that output to `flyovers.log`.
 
 ## Installation
 
@@ -31,15 +31,70 @@ LISTEN_ADDRESS=123 Main St, Elkridge, MD 21075
 FLYOVER_RADIUS_NM=1.0
 BBOX_PADDING_NM=20.0
 POLL_INTERVAL_SEC=30
+LOG_LEVEL=INFO
+TERMINAL_LOGGING=true
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
 
 `BBOX_PADDING_NM` controls how much extra area around the flyover radius is queried from OpenSky. The default of `20.0` means the bounding box extends approximately 21 nautical miles in each cardinal direction from the listening location (20 nm padding plus the 1 nm flyover radius). This affects which aircraft are fetched and shown in bbox poll summaries; it does not change the flyover detection radius.
 
-`API_CONFIG_TOKEN` is required to enable `POST /api/config`. Send it as an `Authorization: Bearer <token>` header. If it is unset, that endpoint is disabled. Set the value as a secret environment variable in Render.
+`API_CONFIG_TOKEN` is required to enable `POST /api/config`; provide its value in the `Authorization` header. If unset, that endpoint is disabled. For local runs, set it in `.env`.
+
+Application output is appended to `flyovers.log` in the working directory. Set `TERMINAL_LOGGING=false` in `.env` to suppress it in the terminal; it defaults to `true`. Detected flyover records are also stored separately in `flyovers.jsonl`.
+
+### Supabase live snapshot
+
+This sync runs in the HTTP server (`python server.py`), which provides `GET /api/live`; the standalone `python main.py` CLI does not expose that endpoint.
+
+When both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, the server upserts the latest `/api/live` response after every poll into one row in `public.live_snapshot`. The row has `id = 'current'`, a `payload` JSONB column containing `last_poll_time`, `count`, and `aircraft`, and an `updated_at` timestamp. Empty polls replace the previous aircraft list with `count: 0` and `aircraft: []`. If the sync fails, the error is logged and local tracking continues. If both settings are absent, syncing is disabled.
+
+Create the table and read policy in the Supabase SQL editor:
+
+```sql
+create table public.live_snapshot (
+  id text primary key check (id = 'current'),
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.live_snapshot enable row level security;
+grant select on public.live_snapshot to anon, authenticated;
+grant all on public.live_snapshot to service_role;
+
+create policy "Allow reading the current live snapshot"
+  on public.live_snapshot
+  for select
+  to anon, authenticated
+  using (id = 'current');
+```
+
+Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in the local `.env` file. Do not commit `.env` or expose the service-role key to React. The React app can use its Supabase URL and anon key to read:
+
+```javascript
+const { data, error } = await supabase
+  .from("live_snapshot")
+  .select("payload, updated_at")
+  .eq("id", "current")
+  .single();
+```
+
+`data.payload` has the same shape as `GET /api/live`.
+
+### External API debug logs
+
+Set `LOG_LEVEL=DEBUG` to emit two entries per outbound API call: a `begin calling` entry before the request and a `done calling` entry afterward. The done entry includes the HTTP code and up to 1 KiB of response content; larger bodies are marked as truncated. Request credentials and authorization headers are not logged, and sensitive token fields in response bodies are redacted. Calls that fail before receiving a response have a done entry with the error instead of an HTTP code. The default is `INFO`, which keeps these debug entries out of normal logs.
 
 ## Running the App
 
-Start the poll loop:
+To run the HTTP server locally (including `/api/live` and Supabase snapshot sync):
+```bash
+python server.py
+```
+
+The server reads `.env` from the project directory and listens on port `8080` by default. Open `http://localhost:8080/api/live` to inspect the current snapshot. To run only the command-line poller instead, use `python main.py`; that mode does not expose `/api/live` or sync snapshots to Supabase.
+
+Alternatively, start the standalone CLI poll loop:
 ```bash
 python main.py
 ```

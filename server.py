@@ -1,5 +1,6 @@
 import hmac
 import json
+import logging
 import os
 import threading
 import time
@@ -8,6 +9,7 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from typing import Optional, List, Dict, Any
 
+from api_logging import configure_logging
 from config import load_settings, Settings
 from opensky_client import OpenSkyClient, StateVector
 import flyover_detector
@@ -16,6 +18,10 @@ import weather_client
 import flight_enricher
 import record_builder
 import printer
+import supabase_client
+
+
+logger = logging.getLogger(__name__)
 
 
 class TrackerWorker:
@@ -85,6 +91,15 @@ class TrackerWorker:
                 "flyover_radius_nm": self.settings.flyover_radius_nm,
             }
 
+    def get_live_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            aircraft = [dict(vector) for vector in self.current_vectors]
+            return {
+                "last_poll_time": self.last_poll_time,
+                "count": len(aircraft),
+                "aircraft": aircraft,
+            }
+
     def _bbox_altitude_color(self, sv: StateVector) -> str:
         altitude_ft = int(round(sv.altitude_m * 3.28084))
         previous_altitude_m = self.previous_altitudes_m.get(sv.icao24)
@@ -98,6 +113,8 @@ class TrackerWorker:
         return ""
 
     def _poll_once(self):
+        print("DEBUG: reached this point in _poll_once()")
+       
         vectors = self.client.fetch()
         now = time.time()
         time_str = datetime.now().strftime("%H:%M:%S")
@@ -119,6 +136,11 @@ class TrackerWorker:
                 }
                 for sv in vectors
             ]
+
+        try:
+            supabase_client.upsert_live_snapshot(self.get_live_snapshot())
+        except Exception as error:
+            logger.error("Failed to sync live snapshot to Supabase: %s", error)
 
         # Check for flyovers
         flyovers_to_process = []
@@ -165,6 +187,8 @@ class TrackerWorker:
                 if flyovers_to_process
                 else " — 0 flyovers."
             )
+            print("DEBUG: reached this point")
+
             print(
                 f"[{time_str}] [Poll] {len(vectors)} aircraft in bbox "
                 f"[{', '.join(ac_list)}{extra}]{flyover_summary}"
@@ -243,7 +267,8 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
     def _send_json(self, status_code: int, data: Any):
-        body = json.dumps(data, indent=2).encode("utf-8")
+       # body = json.dumps(data, indent=2).encode("utf-8")
+        print(f"[body] {body}")
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -253,7 +278,7 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
         self.wfile.write(body)
-
+    
     def do_OPTIONS(self):
         self.send_response(204)
         self._send_cors_headers()
@@ -263,7 +288,7 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
         query = parse_qs(parsed.query)
-
+        print(f"[HTTP] GET {path} with query {query}")
         if path == "/api/status" or path == "":
             self._send_json(200, self.worker.get_status())
             return
@@ -297,13 +322,7 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
             return
 
         elif path == "/api/live":
-            with self.worker._lock:
-                data = {
-                    "last_poll_time": self.worker.last_poll_time,
-                    "count": len(self.worker.current_vectors),
-                    "aircraft": self.worker.current_vectors,
-                }
-            self._send_json(200, data)
+            self._send_json(200, self.worker.get_live_snapshot())
             return
 
         else:
@@ -356,6 +375,7 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port: int = 8080):
+    configure_logging()
     settings = load_settings()
     log_file = "flyovers.jsonl"
 

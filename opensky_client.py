@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Optional
 import time
 import requests
+from api_logging import logged_request
 
 @dataclass
 class TrackWaypoint:
@@ -52,7 +53,14 @@ class OpenSkyClient:
             "client_secret": self.client_secret
         }
         try:
-            resp = requests.post(token_url, data=data, timeout=10)
+            resp = logged_request(
+                "OpenSky OAuth",
+                "POST",
+                token_url,
+                requests.post,
+                data=data,
+                timeout=10,
+            )
             if resp.status_code == 200:
                 token_data = resp.json()
                 self.token = token_data.get("access_token")
@@ -81,7 +89,16 @@ class OpenSkyClient:
 
         headers = self._get_auth_headers()
         try:
-            resp = requests.get(url, params=params, headers=headers, timeout=15)
+            print(f"[OpenSky] Fetching states with bbox {params} and headers {headers}")
+            resp = logged_request(
+                "OpenSky states",
+                "GET",
+                url,
+                requests.get,
+                params=params,
+                headers=headers,
+                timeout=15,
+            )
             if resp.status_code != 200:
                 print(f"[OpenSky] API call returned status {resp.status_code}")
                 return []
@@ -143,7 +160,15 @@ class OpenSkyClient:
 
         headers = self._get_auth_headers()
         try:
-            resp = requests.get(url, params=params, headers=headers, timeout=15)
+            resp = logged_request(
+                "OpenSky tracks",
+                "GET",
+                url,
+                requests.get,
+                params=params,
+                headers=headers,
+                timeout=15,
+            )
             if resp.status_code == 404:
                 # Aircraft has no stored track – not an error worth logging
                 return []

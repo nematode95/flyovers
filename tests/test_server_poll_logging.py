@@ -10,6 +10,14 @@ from server import FlyoverRequestHandler, TrackerWorker
 
 
 class TestPollAircraftLogging(unittest.TestCase):
+    def setUp(self):
+        self.supabase_env = patch.dict(
+            os.environ,
+            {"SUPABASE_URL": "", "SUPABASE_SERVICE_ROLE_KEY": ""},
+        )
+        self.supabase_env.start()
+        self.addCleanup(self.supabase_env.stop)
+
     def make_settings(self):
         return Settings(
             opensky_client_id="",
@@ -89,6 +97,35 @@ class TestPollAircraftLogging(unittest.TestCase):
         self.assertIn("\033[31mP01\033[0m [000001]", outputs[2])
         self.assertIn("\033[35m", outputs[3])
         self.assertIn("\033[35mP01\033[0m [000001]", outputs[3])
+
+    def test_syncs_exact_live_snapshot_including_empty_polls(self):
+        worker = TrackerWorker(self.make_settings())
+        worker.current_vectors = [{"icao24": "stale"}]
+        worker.client = Mock()
+        worker.client.fetch.return_value = []
+
+        with patch("server.supabase_client.upsert_live_snapshot") as sync_snapshot:
+            worker._poll_once()
+
+        snapshot = sync_snapshot.call_args.args[0]
+        self.assertEqual(set(snapshot), {"last_poll_time", "count", "aircraft"})
+        self.assertIsNotNone(snapshot["last_poll_time"])
+        self.assertEqual(snapshot["count"], 0)
+        self.assertEqual(snapshot["aircraft"], [])
+        self.assertEqual(worker.get_live_snapshot(), snapshot)
+
+    def test_supabase_failure_does_not_interrupt_poll(self):
+        worker = TrackerWorker(self.make_settings())
+        worker.client = Mock()
+        worker.client.fetch.return_value = []
+
+        with patch(
+            "server.supabase_client.upsert_live_snapshot",
+            side_effect=OSError("database unavailable"),
+        ):
+            worker._poll_once()
+
+        self.assertEqual(worker.get_live_snapshot()["count"], 0)
 
 
 class TestConfigEndpointAuth(unittest.TestCase):

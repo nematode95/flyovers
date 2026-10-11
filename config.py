@@ -15,6 +15,7 @@ except ImportError:
                 line = line.strip()
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
+                   #os.environ[k.strip()] = v.strip()
 
 # TODO consider the little runway labels like 15L and 33R, which are not in the original BWI runways list.  For now, we will just ignore them.
 # 335 is correct see https://marylandaviation.com/environmental/airport-noise/acronyms-faqs-more/   
