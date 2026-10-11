@@ -83,6 +83,43 @@ const { data, error } = await supabase
 
 `data.payload` has the same shape as `GET /api/live`.
 
+### Supabase recent flyovers
+
+When both `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, the HTTP server (`python server.py`) syncs the latest five records from the local `flyovers.jsonl` log into one row in `public.recent_flyovers`. The row has `id = 'current'`, a `flyovers` JSONB array ordered newest first, and an `updated_at` timestamp. The server syncs the existing log at startup and refreshes the row after each new flyover is logged. The standalone `python main.py` CLI does not sync to Supabase.
+
+Create the table and read policy in the Supabase SQL editor:
+
+```sql
+create table public.recent_flyovers (
+  id text primary key check (id = 'current'),
+  flyovers jsonb not null default '[]'::jsonb
+    check (jsonb_typeof(flyovers) = 'array' and jsonb_array_length(flyovers) <= 5),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.recent_flyovers enable row level security;
+grant select on public.recent_flyovers to anon, authenticated;
+grant all on public.recent_flyovers to service_role;
+
+create policy "Allow reading the recent flyovers"
+  on public.recent_flyovers
+  for select
+  to anon, authenticated
+  using (id = 'current');
+```
+
+The React app can read the latest records using its Supabase URL and anon key:
+
+```javascript
+const { data, error } = await supabase
+  .from("recent_flyovers")
+  .select("flyovers, updated_at")
+  .eq("id", "current")
+  .single();
+```
+
+`data.flyovers` contains up to five complete flyover records, newest first. Keep `SUPABASE_SERVICE_ROLE_KEY` on the server; do not expose it to React.
+
 ### External API debug logs
 
 Set `LOG_EXTERNAL_API=true` to emit two entries per outbound API call: a `begin calling` entry before the request and a `done calling` entry afterward. The done entry includes the HTTP code and up to 1 KiB of response content; larger bodies are marked as truncated. Request credentials and authorization headers are not logged, and sensitive token fields in response bodies are redacted. Calls that fail before receiving a response have a done entry with the error instead of an HTTP code. When `LOG_EXTERNAL_API=false`, low-level `urllib3` connection messages are also suppressed, even if `LOG_LEVEL=DEBUG`.

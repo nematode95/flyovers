@@ -100,6 +100,36 @@ class TrackerWorker:
                 "aircraft": aircraft,
             }
 
+    def get_recent_flyovers(self) -> List[Dict[str, Any]]:
+        records: List[Dict[str, Any]] = []
+        if not os.path.exists(self.log_file):
+            return records
+
+        with open(self.log_file, "r", encoding="utf-8") as f:
+            for line_number, line in enumerate(f, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError as error:
+                    logger.warning("Skipping invalid JSON in %s at line %d: %s", self.log_file, line_number, error)
+                    continue
+                if not isinstance(record, dict):
+                    logger.warning("Skipping non-object flyover record in %s at line %d.", self.log_file, line_number)
+                    continue
+                records.append(record)
+
+        return list(reversed(records[-5:]))
+
+    def sync_recent_flyovers(self):
+        if not os.path.exists(self.log_file):
+            return
+        try:
+            supabase_client.upsert_recent_flyovers(self.get_recent_flyovers())
+        except Exception as error:
+            logger.error("Failed to sync recent flyovers to Supabase: %s", error)
+
     def _bbox_altitude_color(self, sv: StateVector) -> str:
         altitude_ft = int(round(sv.altitude_m * 3.28084))
         previous_altitude_m = self.previous_altitudes_m.get(sv.icao24)
@@ -222,6 +252,7 @@ class TrackerWorker:
                 heading_source=heading_source,
             )
             printer.print_and_log(record, velocity_mps=sv.velocity_mps, log_file=self.log_file)
+            self.sync_recent_flyovers()
             self.seen[sv.icao24] = now
 
     def _run_loop(self):
@@ -378,6 +409,7 @@ def run_server(port: int = 8080):
     log_file = "flyovers.jsonl"
 
     worker = TrackerWorker(settings=settings, log_file=log_file)
+    worker.sync_recent_flyovers()
     worker.start()
 
     FlyoverRequestHandler.worker = worker

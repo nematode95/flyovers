@@ -1,5 +1,7 @@
 import io
+import json
 import os
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from unittest.mock import Mock, patch
@@ -126,6 +128,23 @@ class TestPollAircraftLogging(unittest.TestCase):
             worker._poll_once()
 
         self.assertEqual(worker.get_live_snapshot()["count"], 0)
+
+    def test_syncs_only_five_newest_logged_flyovers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log_file = os.path.join(directory, "flyovers.jsonl")
+            with open(log_file, "w", encoding="utf-8") as f:
+                for number in range(7):
+                    f.write(json.dumps({"flight_number": f"SWA{number}"}) + "\n")
+
+            worker = TrackerWorker(self.make_settings(), log_file=log_file)
+            with patch("server.supabase_client.upsert_recent_flyovers") as sync_flyovers:
+                worker.sync_recent_flyovers()
+
+        synced = sync_flyovers.call_args.args[0]
+        self.assertEqual(
+            [record["flight_number"] for record in synced],
+            ["SWA6", "SWA5", "SWA4", "SWA3", "SWA2"],
+        )
 
 
 class TestConfigEndpointAuth(unittest.TestCase):
