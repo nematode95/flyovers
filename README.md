@@ -39,9 +39,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 `BBOX_PADDING_NM` controls how much extra area around the flyover radius is queried from OpenSky. The default of `20.0` means the bounding box extends approximately 21 nautical miles in each cardinal direction from the listening location (20 nm padding plus the 1 nm flyover radius). This affects which aircraft are fetched and shown in bbox poll summaries; it does not change the flyover detection radius.
 
+When settings load, the app writes an interactive `bbox_map.html` showing the computed OpenSky bounding box in the current working directory and logs its absolute `file://` link.
+
 `API_CONFIG_TOKEN` is required to enable `POST /api/config`; provide its value in the `Authorization` header. If unset, that endpoint is disabled. For local runs, set it in `.env`.
 
-Python log records are written to the terminal and appended to `flyovers.log` in the working directory. Set `LOG_EXTERNAL_API=true` to include begin/end details for outbound API calls such as OpenSky and weather; it defaults to `false`. This setting does not redirect or suppress standard output. Detected flyover records are also stored separately in `flyovers.jsonl`.
+Python log records are written to the terminal and appended to `flyovers.log` in the working directory. At startup, the app logs the environment variables it recognizes; credential, secret, and token values are redacted. Set `LOG_EXTERNAL_API=true` to include begin/end details for outbound API calls such as OpenSky and weather; it defaults to `false`. This setting does not redirect or suppress standard output. Detected flyover records are also stored separately in `flyovers.jsonl`.
 
 ### Supabase live snapshot
 

@@ -1,13 +1,22 @@
 from dataclasses import dataclass, field
+import logging
 import os
 import math
+from pathlib import Path
+
+import folium
+
 from geocoder import geocode_address
+
+
+LOGGER = logging.getLogger(__name__)
 
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     # Fallback env file parser if python-dotenv is not installed
+    print("[Warning] python-dotenv not installed; falling back to basic .env parsing.")
     env_path = os.path.join(os.path.dirname(__file__), ".env")
     if os.path.exists(env_path):
         with open(env_path, "r", encoding="utf-8") as f:
@@ -39,6 +48,7 @@ class Settings:
 
 def compute_bbox(lat: float, lon: float, radius_nm: float, padding_nm: float = 20.0) -> dict:
     total_radius = radius_nm + padding_nm
+    print(f"[DEBUG] Computing bbox for lat={lat}, lon={lon}, radius_nm={radius_nm}, padding_nm={padding_nm}, total_radius={total_radius}")
     # 1 nm latitude ≈ 1/60°
     lat_delta = total_radius / 60.0
     # 1 nm longitude ≈ 1 / (60 * cos(lat))
@@ -51,6 +61,80 @@ def compute_bbox(lat: float, lon: float, radius_nm: float, padding_nm: float = 2
         "lamax": round(lat + lat_delta, 4),
         "lomax": round(lon + lon_delta, 4),
     }
+
+
+# def write_bbox_map(lat: float, lon: float, bbox: dict) -> Path:
+#     map_path = Path.cwd() / "bbox_map.html"
+#     map_view = folium.Map(location=[lat, lon], zoom_start=11)
+#     folium.Rectangle(
+#         bounds=[
+#             [bbox["lamin"], bbox["lomin"]],
+#             [bbox["lamax"], bbox["lomax"]],
+#         ],
+#         color="blue",
+#         fill=True,
+#         fill_color="blue",
+#         fill_opacity=0.2,
+#         popup="OpenSky BBox",
+#     ).add_to(map_view)
+#     map_view.save(str(map_path))
+#     LOGGER.info("OpenSky bounding-box map: %s", map_path.as_uri())
+#     return map_path
+
+
+# def write_bbox_map(lat: float, lon: float, bbox: dict) -> Path:
+#     map_path = Path.cwd() / "bbox_map.html"
+    
+#     # Use CartoDB Positron tiles instead of default OpenStreetMap
+#     map_view = folium.Map(
+#         location=[lat, lon], 
+#         zoom_start=11, 
+#         tiles="CartoDB positron"
+#     )
+    
+#     folium.Rectangle(
+#         bounds=[
+#             [bbox["lamin"], bbox["lomin"]],
+#             [bbox["lamax"], bbox["lomax"]],
+#         ],
+#         color="blue",
+#         fill=True,
+#         fill_color="blue",
+#         fill_opacity=0.2,
+#         popup="OpenSky BBox",
+#     ).add_to(map_view)
+    
+#     map_view.save(str(map_path))
+#     LOGGER.info("OpenSky bounding-box map: %s", map_path.as_uri())
+#     return map_path
+
+
+def write_bbox_map(lat: float, lon: float, bbox: dict) -> Path:
+    map_path = Path.cwd() / "bbox_map.html"
+    
+    # Use OpenTopoMap tiles (Free, no API key required)
+    map_view = folium.Map(
+        location=[lat, lon], 
+        zoom_start=11, 
+        tiles="OpenTopoMap",
+        attr="Map data: &copy; OpenStreetMap contributors, SRTM | Map style: &copy; OpenTopoMap (CC-BY-SA)"
+    )
+    
+    folium.Rectangle(
+        bounds=[
+            [bbox["lamin"], bbox["lomin"]],
+            [bbox["lamax"], bbox["lomax"]],
+        ],
+        color="blue",
+        fill=True,
+        fill_color="blue",
+        fill_opacity=0.2,
+        popup="OpenSky BBox",
+    ).add_to(map_view)
+    
+    map_view.save(str(map_path))
+    LOGGER.info("OpenSky bounding-box map: %s", map_path.as_uri())
+    return map_path
 
 def load_settings() -> Settings:
     client_id = os.getenv("OPENSKY_CLIENT_ID", "")
@@ -74,6 +158,10 @@ def load_settings() -> Settings:
 
     lat, lon = geocode_address(address)
     bbox = compute_bbox(lat, lon, radius_nm, bbox_padding_nm)
+    write_bbox_map(lat, lon, bbox)
+    # log the bbox for debugging purposes witht he padding and radius
+    print(f"[DEBUG] Computed bbox: {bbox}")
+    print(f"[DEBUG] Bbox parameters - lat: {lat}, lon: {lon}, radius: {radius_nm}, padding: {bbox_padding_nm}")
 
     return Settings(
         opensky_client_id=client_id,

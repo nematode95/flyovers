@@ -93,6 +93,37 @@ logged_request(
         self.assertNotIn("Starting new HTTPS connection", result.stderr)
         self.assertNotIn("Starting new HTTPS connection", log_contents)
 
+    def test_configure_logging_reports_application_environment_and_redacts_secrets(self):
+        project_root = Path(__file__).resolve().parents[1]
+        script = """
+from api_logging import configure_logging
+
+configure_logging()
+"""
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = str(project_root)
+        environment["LISTEN_ADDRESS"] = "Example Street"
+        environment["OPENSKY_CLIENT_SECRET"] = "private-client-secret"
+        environment["API_CONFIG_TOKEN"] = "private-api-token"
+
+        with tempfile.TemporaryDirectory() as working_directory:
+            subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=working_directory,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            log_contents = (Path(working_directory) / "flyovers.log").read_text(encoding="utf-8")
+
+        self.assertIn("Environment variable LISTEN_ADDRESS=Example Street", log_contents)
+        self.assertIn("Environment variable OPENSKY_CLIENT_SECRET=[REDACTED]", log_contents)
+        self.assertIn("Environment variable API_CONFIG_TOKEN=[REDACTED]", log_contents)
+        self.assertNotIn("private-client-secret", log_contents)
+        self.assertNotIn("private-api-token", log_contents)
+
     def test_response_preview_redacts_token_values(self):
         preview = _response_preview(
             '{"access_token":"private-token","supabase_service_role_key":"service-secret",'

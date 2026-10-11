@@ -89,7 +89,7 @@ class OpenSkyClient:
 
         headers = self._get_auth_headers()
         try:
-            print(f"[OpenSky] Fetching states with bbox {params} and headers {headers}")
+            print(f"[OpenSky] Fetching states with bbox {params}")
             resp = logged_request(
                 "OpenSky states",
                 "GET",

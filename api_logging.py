@@ -7,7 +7,25 @@ from urllib.parse import urlsplit
 
 
 LOGGER = logging.getLogger("external_api")
+CONFIG_LOGGER = logging.getLogger("configuration")
 MAX_RESPONSE_LOG_BYTES = 1024
+APPLICATION_ENVIRONMENT_VARIABLES = (
+    "API_CONFIG_TOKEN",
+    "BBOX_PADDING_NM",
+    "FLYOVER_RADIUS_NM",
+    "LISTEN_ADDRESS",
+    "LOG_EXTERNAL_API",
+    "LOG_LEVEL",
+    "OPENSKY_BEARER_TOKEN",
+    "OPENSKY_CLIENT_ID",
+    "OPENSKY_CLIENT_SECRET",
+    "OPENSKY_TOKEN",
+    "POLL_INTERVAL_SEC",
+    "PORT",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "SUPABASE_URL",
+    "TOKEN",
+)
 _SENSITIVE_KEYS = {
     "accesstoken",
     "api_key",
@@ -28,7 +46,10 @@ _SENSITIVE_KEYS = {
 
 def _is_sensitive_key(key: str) -> bool:
     normalized = re.sub(r"[^a-z0-9]", "", key.lower())
-    return normalized in _SENSITIVE_KEYS
+    return normalized in _SENSITIVE_KEYS or any(
+        marker in normalized
+        for marker in ("password", "secret", "token", "apikey", "credential")
+    )
 
 
 def configure_logging() -> None:
@@ -57,6 +78,10 @@ def configure_logging() -> None:
     logging.getLogger("urllib3").setLevel(
         logging.NOTSET if log_external_api else logging.WARNING
     )
+    for name in APPLICATION_ENVIRONMENT_VARIABLES:
+        if name in os.environ:
+            value = "[REDACTED]" if _is_sensitive_key(name) else os.environ[name]
+            CONFIG_LOGGER.info("Environment variable %s=%s", name, value)
 
 
 def _endpoint(url: str) -> str:

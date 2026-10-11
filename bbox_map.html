@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="https://netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css"/>
+    
+            <meta name="viewport" content="width=device-width,
+                initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+            <style>
+                #map_bca7b1d7927c5edc8562ab93be70fbab {
+                    position: relative;
+                    width: 100.0%;
+                    height: 100.0%;
+                    left: 0.0%;
+                    top: 0.0%;
+                }
+                .leaflet-container { font-size: 1rem; }
+            </style>
+
+            <style>html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+            }
+            </style>
+
+            <style>#map {
+                position:absolute;
+                top:0;
+                bottom:0;
+                right:0;
+                left:0;
+                }
+            </style>
+
+            <script>
+                L_NO_TOUCH = false;
+                L_DISABLE_3D = false;
+            </script>
+
+        
+</head>
+<body>
+    
+    
+            <div class="folium-map" id="map_bca7b1d7927c5edc8562ab93be70fbab" ></div>
+        
+</body>
+<script>
+    
+    
+            var map_bca7b1d7927c5edc8562ab93be70fbab = L.map(
+                "map_bca7b1d7927c5edc8562ab93be70fbab",
+                {
+                    center: [39.2110476, -76.7797562],
+                    crs: L.CRS.EPSG3857,
+                    ...{
+  "zoom": 11,
+  "zoomControl": true,
+  "preferCanvas": false,
+}
+
+                }
+            );
+
+            
+
+        
+    
+            var tile_layer_ee1bd5a0738592271e825c11530f02e8 = L.tileLayer(
+                "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+                {
+  "minZoom": 0,
+  "maxZoom": 17,
+  "maxNativeZoom": 17,
+  "noWrap": false,
+  "attribution": "Map data: \u0026copy; OpenStreetMap contributors, SRTM | Map style: \u0026copy; OpenTopoMap (CC-BY-SA)",
+  "subdomains": "abc",
+  "detectRetina": false,
+  "tms": false,
+  "opacity": 1,
+}
+
+            );
+        
+    
+            tile_layer_ee1bd5a0738592271e825c11530f02e8.addTo(map_bca7b1d7927c5edc8562ab93be70fbab);
+        
+    
+            var rectangle_d603887e3ca98085109e130abcc996be = L.rectangle(
+                [[38.861, -77.2315], [39.561, -76.328]],
+                {"bubblingMouseEvents": true, "color": "blue", "dashArray": null, "dashOffset": null, "fill": true, "fillColor": "blue", "fillOpacity": 0.2, "fillRule": "evenodd", "lineCap": "round", "lineJoin": "round", "noClip": false, "opacity": 1.0, "smoothFactor": 1.0, "stroke": true, "weight": 3}
+            ).addTo(map_bca7b1d7927c5edc8562ab93be70fbab);
+        
+    
+        var popup_c340ddba7e74d5880f3742e8f192862e = L.popup({
+  "maxWidth": "100%",
+});
+
+        
+            
+                var html_764334081acd105f92210d112285fb9f = $(`<div id="html_764334081acd105f92210d112285fb9f" style="width: 100.0%; height: 100.0%;">OpenSky BBox</div>`)[0];
+                popup_c340ddba7e74d5880f3742e8f192862e.setContent(html_764334081acd105f92210d112285fb9f);
+            
+        
+
+        rectangle_d603887e3ca98085109e130abcc996be.bindPopup(popup_c340ddba7e74d5880f3742e8f192862e)
+        ;
+
+        
+    
+</script>
+</html>
