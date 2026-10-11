@@ -14,7 +14,7 @@ import argparse
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Union, List
 
-from api_logging import configure_logging, log_call_started, log_http_error, log_http_response, logged_request
+from api_logging import configure_logging,  log_call_started, log_http_error, log_http_response, logged_request
 
 # Try importing requests; fallback to urllib.request if unavailable
 try:

@@ -2,15 +2,11 @@ import json
 import logging
 import os
 import re
-import sys
-import threading
 from typing import Any, Callable, Union
 from urllib.parse import urlsplit
 
 
 LOGGER = logging.getLogger("external_api")
-_OUTPUT_LOG_FILE = None
-_OUTPUT_LOG_LOCK = threading.Lock()
 MAX_RESPONSE_LOG_BYTES = 1024
 _SENSITIVE_KEYS = {
     "accesstoken",
@@ -30,53 +26,16 @@ _SENSITIVE_KEYS = {
 }
 
 
-class _TeeStream:
-    def __init__(self, console, log_file, terminal_enabled: bool):
-        self.console = console
-        self.log_file = log_file
-        self.terminal_enabled = terminal_enabled
-
-    def write(self, text: str) -> int:
-        with _OUTPUT_LOG_LOCK:
-            if self.terminal_enabled:
-                self.console.write(text)
-            self.log_file.write(text)
-            self.log_file.flush()
-        return len(text)
-
-    def flush(self) -> None:
-        with _OUTPUT_LOG_LOCK:
-            if self.terminal_enabled:
-                self.console.flush()
-            self.log_file.flush()
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.console, name)
-
-
 def _is_sensitive_key(key: str) -> bool:
     normalized = re.sub(r"[^a-z0-9]", "", key.lower())
     return normalized in _SENSITIVE_KEYS
 
 
 def configure_logging() -> None:
-    global _OUTPUT_LOG_FILE
-
-    terminal_logging = os.getenv("TERMINAL_LOGGING", "true").strip().lower()
-    if terminal_logging not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
-        raise ValueError(f"Invalid TERMINAL_LOGGING: {terminal_logging}")
-    terminal_enabled = terminal_logging in {"true", "1", "yes", "on"}
-
-    if _OUTPUT_LOG_FILE is None:
-        _OUTPUT_LOG_FILE = open("flyovers.log", "a", encoding="utf-8", buffering=1)
-    if isinstance(sys.stdout, _TeeStream):
-        sys.stdout.terminal_enabled = terminal_enabled
-    else:
-        sys.stdout = _TeeStream(sys.stdout, _OUTPUT_LOG_FILE, terminal_enabled)
-    if isinstance(sys.stderr, _TeeStream):
-        sys.stderr.terminal_enabled = terminal_enabled
-    else:
-        sys.stderr = _TeeStream(sys.stderr, _OUTPUT_LOG_FILE, terminal_enabled)
+    external_api_logging = os.getenv("LOG_EXTERNAL_API", "false").strip().lower()
+    if external_api_logging not in {"true", "false", "1", "0", "yes", "no", "on", "off"}:
+        raise ValueError(f"Invalid LOG_EXTERNAL_API: {external_api_logging}")
+    log_external_api = external_api_logging in {"true", "1", "yes", "on"}
 
     level_name = os.getenv("LOG_LEVEL", "INFO").upper()
     level = getattr(logging, level_name, None)
@@ -86,9 +45,18 @@ def configure_logging() -> None:
     logging.basicConfig(
         level=level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler("flyovers.log", encoding="utf-8"),
+        ],
         force=True,
     )
-    print(f"DEBUG: reached this point in configure_logging() with LOG_LEVEL={level_name} and TERMINAL_LOGGING={terminal_logging}")
+    LOGGER.disabled = not log_external_api
+    if log_external_api:
+        LOGGER.setLevel(logging.DEBUG)
+    logging.getLogger("urllib3").setLevel(
+        logging.NOTSET if log_external_api else logging.WARNING
+    )
 
 
 def _endpoint(url: str) -> str:
@@ -195,7 +163,6 @@ def logged_request(
     request: Callable[..., Any],
     **kwargs: Any,
 ) -> Any:
-    print(f"[crap] Calling external API service={service} method={method.upper()} endpoint={_endpoint(url)}")
     if LOGGER.isEnabledFor(logging.DEBUG):
         LOGGER.debug(
             "begin calling external API service=%s method=%s endpoint=%s",
@@ -204,7 +171,6 @@ def logged_request(
             _endpoint(url),
         )
     try:
-        print(f"[crap] Calling external API service={service} method={method.upper()} endpoint={_endpoint(url)}")
         response = request(url, **kwargs)
     except Exception as error:
         log_http_error(service, method.upper(), url, error)

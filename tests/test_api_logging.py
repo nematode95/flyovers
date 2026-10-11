@@ -12,7 +12,7 @@ from api_logging import MAX_RESPONSE_LOG_BYTES, _response_preview, logged_reques
 
 
 class TestApiLogging(unittest.TestCase):
-    def test_configure_logging_captures_api_calls_with_existing_root_handler(self):
+    def test_configure_logging_captures_enabled_api_calls_with_existing_root_handler(self):
         project_root = Path(__file__).resolve().parents[1]
         script = """
 import logging
@@ -24,6 +24,7 @@ logging.basicConfig(stream=sys.stderr, level=logging.INFO)
 from api_logging import configure_logging, logged_request
 
 configure_logging()
+print("stdout remains connected")
 logged_request(
     "Test API",
     "GET",
@@ -33,11 +34,11 @@ logged_request(
 """
         environment = os.environ.copy()
         environment["PYTHONPATH"] = str(project_root)
-        environment["LOG_LEVEL"] = "DEBUG"
-        environment["TERMINAL_LOGGING"] = "false"
+        environment["LOG_LEVEL"] = "INFO"
+        environment["LOG_EXTERNAL_API"] = "true"
 
         with tempfile.TemporaryDirectory() as working_directory:
-            subprocess.run(
+            result = subprocess.run(
                 [sys.executable, "-c", script],
                 cwd=working_directory,
                 env=environment,
@@ -50,6 +51,47 @@ logged_request(
 
         self.assertIn("begin calling external API service=Test API", log_contents)
         self.assertIn("done calling external API service=Test API", log_contents)
+        self.assertIn("stdout remains connected", result.stdout)
+
+    def test_configure_logging_disables_external_api_calls_only(self):
+        project_root = Path(__file__).resolve().parents[1]
+        script = """
+import logging
+from types import SimpleNamespace
+
+from api_logging import configure_logging, logged_request
+
+configure_logging()
+print("stdout remains connected")
+logging.getLogger("urllib3.connectionpool").debug("Starting new HTTPS connection")
+logged_request(
+    "Test API",
+    "GET",
+    "https://example.test/status",
+    lambda url, **kwargs: SimpleNamespace(status_code=200, text='{"ok":true}'),
+)
+"""
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = str(project_root)
+        environment["LOG_EXTERNAL_API"] = "false"
+
+        with tempfile.TemporaryDirectory() as working_directory:
+            result = subprocess.run(
+                [sys.executable, "-c", script],
+                cwd=working_directory,
+                env=environment,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            log_contents = (Path(working_directory) / "flyovers.log").read_text(encoding="utf-8")
+
+        self.assertIn("stdout remains connected", result.stdout)
+        self.assertNotIn("external API", log_contents)
+        self.assertNotIn("Starting new HTTPS connection", result.stdout)
+        self.assertNotIn("Starting new HTTPS connection", result.stderr)
+        self.assertNotIn("Starting new HTTPS connection", log_contents)
 
     def test_response_preview_redacts_token_values(self):
         preview = _response_preview(

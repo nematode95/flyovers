@@ -113,8 +113,7 @@ class TrackerWorker:
         return ""
 
     def _poll_once(self):
-        print("DEBUG: reached this point in _poll_once()")
-       
+               
         vectors = self.client.fetch()
         now = time.time()
         time_str = datetime.now().strftime("%H:%M:%S")
@@ -187,8 +186,7 @@ class TrackerWorker:
                 if flyovers_to_process
                 else " — 0 flyovers."
             )
-            print("DEBUG: reached this point")
-
+           
             print(
                 f"[{time_str}] [Poll] {len(vectors)} aircraft in bbox "
                 f"[{', '.join(ac_list)}{extra}]{flyover_summary}"
@@ -267,8 +265,8 @@ class FlyoverRequestHandler(BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
     def _send_json(self, status_code: int, data: Any):
-       # body = json.dumps(data, indent=2).encode("utf-8")
-        print(f"[body] {body}")
+        body = json.dumps(data, indent=2).encode("utf-8")
+       
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

@@ -32,7 +32,7 @@ FLYOVER_RADIUS_NM=1.0
 BBOX_PADDING_NM=20.0
 POLL_INTERVAL_SEC=30
 LOG_LEVEL=INFO
-TERMINAL_LOGGING=true
+LOG_EXTERNAL_API=false
 SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
@@ -41,7 +41,7 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 `API_CONFIG_TOKEN` is required to enable `POST /api/config`; provide its value in the `Authorization` header. If unset, that endpoint is disabled. For local runs, set it in `.env`.
 
-Application output is appended to `flyovers.log` in the working directory. Set `TERMINAL_LOGGING=false` in `.env` to suppress it in the terminal; it defaults to `true`. Detected flyover records are also stored separately in `flyovers.jsonl`.
+Python log records are written to the terminal and appended to `flyovers.log` in the working directory. Set `LOG_EXTERNAL_API=true` to include begin/end details for outbound API calls such as OpenSky and weather; it defaults to `false`. This setting does not redirect or suppress standard output. Detected flyover records are also stored separately in `flyovers.jsonl`.
 
 ### Supabase live snapshot
 
@@ -83,7 +83,7 @@ const { data, error } = await supabase
 
 ### External API debug logs
 
-Set `LOG_LEVEL=DEBUG` to emit two entries per outbound API call: a `begin calling` entry before the request and a `done calling` entry afterward. The done entry includes the HTTP code and up to 1 KiB of response content; larger bodies are marked as truncated. Request credentials and authorization headers are not logged, and sensitive token fields in response bodies are redacted. Calls that fail before receiving a response have a done entry with the error instead of an HTTP code. The default is `INFO`, which keeps these debug entries out of normal logs.
+Set `LOG_EXTERNAL_API=true` to emit two entries per outbound API call: a `begin calling` entry before the request and a `done calling` entry afterward. The done entry includes the HTTP code and up to 1 KiB of response content; larger bodies are marked as truncated. Request credentials and authorization headers are not logged, and sensitive token fields in response bodies are redacted. Calls that fail before receiving a response have a done entry with the error instead of an HTTP code. When `LOG_EXTERNAL_API=false`, low-level `urllib3` connection messages are also suppressed, even if `LOG_LEVEL=DEBUG`.
 
 ## Running the App
 
