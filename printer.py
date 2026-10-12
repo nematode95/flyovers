@@ -48,6 +48,8 @@ def print_and_log(record: FlyoverRecord, velocity_mps: float = 0.0, log_file: st
     print(f"   Altitude  : {record.altitude_ft:,} ft  |  Speed: {speed_kt} kt")
     print(f"   Takeoff hdg: {heading_str}")
     print(f"   Runway    : {record.runway_direction}")
+    if getattr(record, "runway_explanation", None):
+        print(f"   Evidence  : {record.runway_explanation}")
     print(f"   Wind      : {wind_str}")
     print(f"   METAR     : {record.raw_metar}")
     print(f"   Logged to : {log_file}")

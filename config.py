@@ -43,7 +43,9 @@ class Settings:
         "10": 105,
         "28": 285,
         "15R": 155,
-        "33L": 335
+        "33L": 335,
+        "15L": 155,
+        "33R": 335
     })
 
 def compute_bbox(lat: float, lon: float, radius_nm: float, padding_nm: float = 20.0) -> dict:

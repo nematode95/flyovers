@@ -25,6 +25,7 @@ class FlyoverRecord:
     wind_speed_kt: int
     wind_gust_kt: Optional[int]
     raw_metar: str
+    runway_explanation: Optional[str] = None  # Brief explanation of how the runway was determined
 
 def build(
     sv: StateVector,
@@ -34,6 +35,7 @@ def build(
     enrichment: Optional[FlightEnrichment] = None,
     takeoff_heading_deg: Optional[float] = None,
     heading_source: str = "flyover_fallback",
+    runway_explanation: Optional[str] = None,
 ) -> FlyoverRecord:
     """
     Builds a FlyoverRecord instance from state vector, runway inference, wind observation,
@@ -79,7 +81,8 @@ def build(
         wind_direction_deg=wind.direction_deg,
         wind_speed_kt=wind.speed_kt,
         wind_gust_kt=wind.gust_kt,
-        raw_metar=wind.raw_metar
+        raw_metar=wind.raw_metar,
+        runway_explanation=runway_explanation
     )
 
 def to_json_line(record: FlyoverRecord) -> str:

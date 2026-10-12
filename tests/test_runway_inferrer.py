@@ -94,5 +94,89 @@ class TestExtractTakeoffHeading(unittest.TestCase):
         self.assertAlmostEqual(result, 155.0)
 
 
+class TestInferRunwayFromTrack(unittest.TestCase):
+    def test_runway_28_departure(self):
+        # Runway 28 departure rolling west toward Elkridge
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1730, longitude=-76.6600, altitude_m=30.0, true_track=274.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1740, longitude=-76.6800, altitude_m=100.0, true_track=274.0, on_ground=False),
+            TrackWaypoint(timestamp=3, latitude=39.1750, longitude=-76.7100, altitude_m=350.0, true_track=275.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "28")
+        self.assertIn("28", label)
+        self.assertIn("Runway 28", explanation)
+        self.assertAlmostEqual(takeoff_hdg, 274.0)
+
+    def test_runway_33l_departure(self):
+        # Runway 33L departure liftoff near departure end with turn to NW
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1904, longitude=-76.6874, altitude_m=304.0, true_track=310.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1934, longitude=-76.6943, altitude_m=304.0, true_track=287.0, on_ground=False),
+            TrackWaypoint(timestamp=3, latitude=39.1944, longitude=-76.7011, altitude_m=304.0, true_track=276.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "33L")
+        self.assertIn("33L", label)
+        self.assertIn("Runway 33L", explanation)
+        self.assertAlmostEqual(takeoff_hdg, 310.0)
+
+    def test_runway_15r_departure_with_turn(self):
+        # Runway 15R rolling southeast, then right climbing turn northwest over Elkridge
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1830, longitude=-76.6790, altitude_m=30.0, true_track=145.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1650, longitude=-76.6630, altitude_m=120.0, true_track=144.0, on_ground=False),
+            TrackWaypoint(timestamp=3, latitude=39.1500, longitude=-76.6600, altitude_m=300.0, true_track=190.0, on_ground=False),
+            TrackWaypoint(timestamp=4, latitude=39.1700, longitude=-76.7100, altitude_m=600.0, true_track=310.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "15R")
+        self.assertIn("15R", label)
+        self.assertIn("right turn", explanation.lower())
+
+    def test_runway_10_departure(self):
+        # Runway 10 departure rolling east toward Bay
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1745, longitude=-76.6850, altitude_m=30.0, true_track=94.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1735, longitude=-76.6650, altitude_m=150.0, true_track=94.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "10")
+        self.assertIn("10", label)
+        self.assertIn("Runway 10", explanation)
+
+    def test_runway_15l_departure_with_turn(self):
+        # Runway 15L (parallel to 15R, eastern side) rolling southeast, then right climbing turn northwest over Elkridge
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1850, longitude=-76.6610, altitude_m=30.0, true_track=144.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1780, longitude=-76.6550, altitude_m=120.0, true_track=144.0, on_ground=False),
+            TrackWaypoint(timestamp=3, latitude=39.1600, longitude=-76.6500, altitude_m=300.0, true_track=190.0, on_ground=False),
+            TrackWaypoint(timestamp=4, latitude=39.1800, longitude=-76.7100, altitude_m=600.0, true_track=310.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "15L")
+        self.assertIn("15L", label)
+        self.assertIn("right turn", explanation.lower())
+
+    def test_runway_10_departure_with_turn(self):
+        # Runway 10 departure rolling east toward Bay, then climbing turn back west over Elkridge
+        track = [
+            TrackWaypoint(timestamp=1, latitude=39.1745, longitude=-76.6850, altitude_m=30.0, true_track=94.0, on_ground=False),
+            TrackWaypoint(timestamp=2, latitude=39.1735, longitude=-76.6650, altitude_m=150.0, true_track=94.0, on_ground=False),
+            TrackWaypoint(timestamp=3, latitude=39.1800, longitude=-76.6200, altitude_m=450.0, true_track=40.0, on_ground=False),
+            TrackWaypoint(timestamp=4, latitude=39.2100, longitude=-76.7200, altitude_m=900.0, true_track=285.0, on_ground=False),
+        ]
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(track)
+        self.assertEqual(rwy_id, "10")
+        self.assertIn("10", label)
+        self.assertIn("climbing turn", explanation.lower())
+
+    def test_fallback_when_empty_track(self):
+        rwy_id, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track([], fallback_heading=283.0)
+        self.assertEqual(rwy_id, "28")
+        self.assertIn("28", label)
+        self.assertIn("inferred from heading", explanation.lower())
+
+
 if __name__ == "__main__":
     unittest.main()

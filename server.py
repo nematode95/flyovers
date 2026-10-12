@@ -238,20 +238,17 @@ class TrackerWorker:
 
         for sv in flyovers_to_process:
             track = self.client.get_track_by_aircraft(sv.icao24)
-            takeoff_hdg = runway_inferrer.extract_takeoff_heading(track)
+            runway, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(
+                track, fallback_heading=sv.true_track, runways=self.settings.runways
+            )
+            heading_source = "historical_track" if (track and takeoff_hdg is not None) else "flyover_fallback"
 
-            if takeoff_hdg is not None:
-                heading_for_runway = takeoff_hdg
-                heading_source = "historical_track"
-            else:
-                heading_for_runway = sv.true_track
-                heading_source = "flyover_fallback"
+            if heading_source == "flyover_fallback":
                 print(
                     f"[{time_str}] [Track] No historical track for {sv.icao24} ({sv.callsign.strip()}); "
                     "using live flyover heading as fallback."
                 )
 
-            runway, label = runway_inferrer.infer_runway(heading_for_runway, self.settings.runways)
             wind = weather_client.get_wind_kbwi()
             enrichment = flight_enricher.enrich_flight(sv.icao24, sv.callsign)
             record = record_builder.build(
@@ -262,6 +259,7 @@ class TrackerWorker:
                 enrichment,
                 takeoff_heading_deg=takeoff_hdg,
                 heading_source=heading_source,
+                runway_explanation=explanation,
             )
             printer.print_and_log(record, velocity_mps=sv.velocity_mps, log_file=self.log_file)
             self.sync_recent_flyovers()
