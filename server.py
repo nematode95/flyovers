@@ -41,7 +41,7 @@ class TrackerWorker:
         self.last_poll_aircraft_count: int = 0
         self.last_error: Optional[str] = None
         self.current_vectors: List[Dict[str, Any]] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
 
@@ -237,33 +237,40 @@ class TrackerWorker:
         self.previous_altitudes_m = {sv.icao24: sv.altitude_m for sv in vectors}
 
         for sv in flyovers_to_process:
-            track = self.client.get_track_by_aircraft(sv.icao24)
-            runway, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(
-                track, fallback_heading=sv.true_track, runways=self.settings.runways
-            )
-            heading_source = "historical_track" if (track and takeoff_hdg is not None) else "flyover_fallback"
+            record = self._resolve_flyover(sv, time_str)
+            self._on_flyover_detected(record, sv, now)
 
-            if heading_source == "flyover_fallback":
-                print(
-                    f"[{time_str}] [Track] No historical track for {sv.icao24} ({sv.callsign.strip()}); "
-                    "using live flyover heading as fallback."
-                )
+    def _resolve_flyover(self, sv: StateVector, time_str: str) -> record_builder.FlyoverRecord:
+        track = self.client.get_track_by_aircraft(sv.icao24)
+        runway, label, explanation, takeoff_hdg = runway_inferrer.infer_runway_from_track(
+            track, fallback_heading=sv.true_track, runways=self.settings.runways
+        )
+        heading_source = "historical_track" if (track and takeoff_hdg is not None) else "flyover_fallback"
 
-            wind = weather_client.get_wind_kbwi()
-            enrichment = flight_enricher.enrich_flight(sv.icao24, sv.callsign)
-            record = record_builder.build(
-                sv,
-                runway,
-                label,
-                wind,
-                enrichment,
-                takeoff_heading_deg=takeoff_hdg,
-                heading_source=heading_source,
-                runway_explanation=explanation,
+        if heading_source == "flyover_fallback":
+            print(
+                f"[{time_str}] [Track] No historical track for {sv.icao24} ({sv.callsign.strip()}); "
+                "using live flyover heading as fallback."
             )
-            printer.print_and_log(record, velocity_mps=sv.velocity_mps, log_file=self.log_file)
-            self.sync_recent_flyovers()
-            self.seen[sv.icao24] = now
+
+        wind = weather_client.get_wind_kbwi()
+        enrichment = flight_enricher.enrich_flight(sv.icao24, sv.callsign)
+        return record_builder.build(
+            sv,
+            runway,
+            label,
+            wind,
+            enrichment,
+            takeoff_heading_deg=takeoff_hdg,
+            heading_source=heading_source,
+            runway_explanation=explanation,
+        )
+
+    def _on_flyover_detected(self, record: record_builder.FlyoverRecord, sv: StateVector, detected_epoch: float):
+        printer.print_and_log(record, velocity_mps=sv.velocity_mps, log_file=self.log_file)
+        self.sync_recent_flyovers()
+        self.seen[sv.icao24] = detected_epoch
+
 
     def _run_loop(self):
         print(f"[Worker] Tracker background thread started. Polling every {self.poll_interval_sec}s.")

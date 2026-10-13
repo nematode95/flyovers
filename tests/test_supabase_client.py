@@ -80,3 +80,33 @@ class TestSupabaseClient(unittest.TestCase):
     def test_recent_flyover_sync_rejects_more_than_five_records(self):
         with self.assertRaisesRegex(ValueError, "At most five"):
             upsert_recent_flyovers([{}] * 6)
+
+    def test_insert_runway_observation_batch_using_service_credentials(self):
+        from supabase_client import insert_runway_observation_batch
+
+        response = Mock()
+        response.raise_for_status.return_value = None
+        batch = {
+            "id": "batch_20261013_120000",
+            "count": 1,
+            "reason": "batch_full",
+            "observations": [{"flight_name": "SWA1"}],
+        }
+
+        with patch.dict(
+            os.environ,
+            {
+                "SUPABASE_URL": "https://project.supabase.co/",
+                "SUPABASE_SERVICE_ROLE_KEY": "service-role-secret",
+            },
+        ):
+            with patch("supabase_client.requests.post", return_value=response) as mock_post:
+                self.assertTrue(insert_runway_observation_batch(batch))
+
+        args, kwargs = mock_post.call_args
+        self.assertEqual(args[0], "https://project.supabase.co/rest/v1/runway_observations")
+        self.assertEqual(kwargs["json"], batch)
+        self.assertEqual(kwargs["headers"]["apikey"], "service-role-secret")
+        self.assertEqual(kwargs["headers"]["Prefer"], "return=minimal")
+        response.raise_for_status.assert_called_once()
+
